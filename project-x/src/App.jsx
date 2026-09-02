@@ -19,6 +19,8 @@ function App() {
   const [isListening, setIsListening] = useState(false);
   const [voiceText, setVoiceText] = useState("");
   const recognitionRef = useRef(null);
+  const [isThinking, setIsThinking] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -45,7 +47,7 @@ function App() {
   };
 
   const sendMessage = async () => {
-    if (!message.trim()) return;
+    if (!message.trim() || isThinking || isTyping) return;
 
     const userMessage = message;
 
@@ -58,6 +60,7 @@ function App() {
     ]);
 
     setMessage("");
+    setIsThinking(true);
 
     try {
       const response = await fetch("http://localhost:5000/api/chat", {
@@ -67,24 +70,61 @@ function App() {
         },
         body: JSON.stringify({
           message: userMessage,
+          history: chatMessages,
         }),
       });
 
+      if (!response.ok) {
+        throw new Error("Server error");
+      }
+
       const data = await response.json();
+
+      setIsThinking(false);
+      setIsTyping(true);
+
+      const fullReply = data.reply;
+
+      // Empty AI message first
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          text: "",
+        },
+      ]);
+
+      let currentText = "";
+
+      for (let i = 0; i < fullReply.length; i++) {
+        currentText += fullReply[i];
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        setChatMessages((prev) => {
+          const updated = [...prev];
+
+          updated[updated.length - 1] = {
+            role: "ai",
+            text: currentText,
+          };
+
+          return updated;
+        });
+      }
+
+      setIsTyping(false);
+    } catch (error) {
+      console.error(error);
+
+      setIsThinking(false);
+      setIsTyping(false);
 
       setChatMessages((prev) => [
         ...prev,
         {
           role: "ai",
-          text: data.reply,
-        },
-      ]);
-    } catch (error) {
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: "ai",
-          text: "AI SERVER OFFLINE",
+          text: "NEURAL CORE ERROR",
         },
       ]);
     }
@@ -337,6 +377,24 @@ function App() {
                               <p>{chat.text}</p>
                             </div>
                           ))}
+
+                          {isThinking && (
+                            <motion.div
+                              className="thinking"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                            >
+                              <span>PROJECT X</span>
+
+                              <div className="thinking-dots">
+                                <i />
+                                <i />
+                                <i />
+                              </div>
+
+                              <small>NEURAL PROCESSING</small>
+                            </motion.div>
+                          )}
                         </div>
 
                         <input
